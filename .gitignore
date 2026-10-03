@@ -1,0 +1,50 @@
+# Dependencies and package-manager caches
+node_modules/
+.pnp.*
+.yarn/
+.pnpm-store/
+
+# Build, generated code, and test output
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+/src/generated/prisma/
+
+# Local environment files; keep the template trackable
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.cache/
+.nest/
+.tmp/
+tmp/
+temp/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# Operating-system files
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Lockfiles, source, .env.example, and prisma/migrations are intentionally tracked.
