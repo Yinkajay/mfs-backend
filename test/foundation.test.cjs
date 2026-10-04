@@ -61,8 +61,11 @@ test('environment configuration validates values and applies safe defaults', () 
   assert.equal(config.HOST, '127.0.0.1');
   assert.equal(config.SWAGGER_ENABLED, true);
   assert.equal(
-    validateEnvironment({ NODE_ENV: 'production', DATABASE_URL: databaseUrl })
-      .SWAGGER_ENABLED,
+    validateEnvironment({
+      NODE_ENV: 'production',
+      DATABASE_URL: databaseUrl,
+      AUTH_ALLOWED_ORIGINS: 'https://mfsservicesng.com',
+    }).SWAGGER_ENABLED,
     false,
   );
   assert.equal(

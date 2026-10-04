@@ -7,7 +7,10 @@ import type { Environment } from './config/environment';
 import { configureApplication } from './configure-app';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { abortOnError: false });
+  const app = await NestFactory.create(AppModule, {
+    abortOnError: false,
+    bodyParser: false,
+  });
 
   try {
     configureApplication(app);

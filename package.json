@@ -15,7 +15,8 @@
     "lint": "eslint src prisma.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run build && node --test test/foundation.test.cjs",
+    "test": "npm run build && node --test test/*.test.cjs",
+    "test:integration": "npm run build && node test/auth.integration.cjs",
     "check": "npm run prisma:validate && npm run lint && npm run format:check && npm test",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
@@ -25,6 +26,7 @@
     "db:status": "docker compose --env-file .env ps",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:development": "node scripts/migrate-development.cjs",
     "db:migrate:status": "prisma migrate status"
   },
   "dependencies": {
@@ -36,6 +38,8 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "dotenv": "^17.0.0",
+    "express": "^5.2.1",
+    "libphonenumber-js": "^1.12.31",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.0.0"
@@ -45,6 +49,7 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/testing": "^11.1.0",
     "@types/node": "^24.0.0",
+    "@types/express": "^5.0.0",
     "eslint": "^10.0.0",
     "prettier": "^3.6.0",
     "prisma": "7.10.0",

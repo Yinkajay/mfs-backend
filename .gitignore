@@ -7,7 +7,7 @@ node_modules/
 # Build, generated code, and test output
 dist/
 build/
-coverage/
+coverage/        
 .nyc_output/
 *.tsbuildinfo
 /src/generated/prisma/
