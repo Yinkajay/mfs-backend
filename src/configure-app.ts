@@ -14,7 +14,7 @@ export function configureApplication(app: INestApplication): void {
   app.enableCors({
     origin: config.get('AUTH_ALLOWED_ORIGINS', { infer: true }),
     credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-MFS-CSRF'],
   });
   app.use(express.json({ limit: '16kb', strict: true }));
@@ -62,7 +62,7 @@ export function configureApplication(app: INestApplication): void {
     const documentConfig = new DocumentBuilder()
       .setTitle('MFS Services API')
       .setDescription(
-        'MFS REST API. Auth mutations require JSON and X-MFS-CSRF: 1. Registration does not create a session; login sets an HttpOnly cookie.',
+        'MFS REST API. POST/PATCH require JSON. All mutations require X-MFS-CSRF: 1. Registration does not create a session; login sets an HttpOnly cookie. Vehicle routes are customer-owned.',
       )
       .setVersion('0.1.0')
       .addCookieAuth(

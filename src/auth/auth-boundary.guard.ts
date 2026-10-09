@@ -35,10 +35,10 @@ export class AuthBoundaryGuard implements CanActivate {
     )
       throw new ForbiddenException('Request origin is not allowed');
     const address = request.ip || request.socket.remoteAddress || 'unknown';
-    if (request.method === 'POST') {
+    if (['POST', 'PATCH', 'DELETE'].includes(request.method)) {
       // Strict JSON + a non-simple custom header + exact-origin CORS is the
       // CSRF defense, including login CSRF. SameSite is an additional layer.
-      if (!request.is('application/json'))
+      if (request.method !== 'DELETE' && !request.is('application/json'))
         throw new UnsupportedMediaTypeException('Use application/json');
       if (request.headers['x-mfs-csrf'] !== '1')
         throw new ForbiddenException('X-MFS-CSRF: 1 is required');

@@ -21,19 +21,20 @@ enum AccountKind {
 }
 
 model User {
-  id              String      @id @default(uuid()) @db.Uuid
-  firstName       String      @map("first_name") @db.VarChar(80)
-  lastName        String      @map("last_name") @db.VarChar(80)
-  email           String      @unique @db.VarChar(254)
-  phone           String      @db.VarChar(16)
-  passwordHash    String      @map("password_hash") @db.VarChar(255)
-  emailVerifiedAt DateTime?   @map("email_verified_at") @db.Timestamptz(3)
-  phoneVerifiedAt DateTime?   @map("phone_verified_at") @db.Timestamptz(3)
-  kind            AccountKind @default(CUSTOMER)
-  status          UserStatus  @default(ACTIVE)
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
-  sessions        Session[]
+  id                String             @id @default(uuid()) @db.Uuid
+  firstName         String             @map("first_name") @db.VarChar(80)
+  lastName          String             @map("last_name") @db.VarChar(80)
+  email             String             @unique @db.VarChar(254)
+  phone             String             @db.VarChar(16)
+  passwordHash      String             @map("password_hash") @db.VarChar(255)
+  emailVerifiedAt   DateTime?          @map("email_verified_at") @db.Timestamptz(3)
+  phoneVerifiedAt   DateTime?          @map("phone_verified_at") @db.Timestamptz(3)
+  kind              AccountKind        @default(CUSTOMER)
+  status            UserStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions          Session[]
+  vehicleOwnerships VehicleOwnership[]
 
   @@map("users")
 }
@@ -62,4 +63,57 @@ model AuthRateLimit {
 
   @@index([expiresAt])
   @@map("auth_rate_limits")
+}
+
+enum VehicleCategoryCode {
+  BIKE
+  SALOON
+  SUV_PICKUP
+  TRUCK
+  BUS_MINI_TRUCK
+}
+
+model VehicleCategory {
+  code     VehicleCategoryCode @id
+  name     String              @db.VarChar(60)
+  vehicles Vehicle[]
+
+  @@map("vehicle_categories")
+}
+
+model Vehicle {
+  id                           String              @id @default(uuid()) @db.Uuid
+  name                         String?             @db.VarChar(80)
+  category                     VehicleCategoryCode @map("category_code")
+  registrationNumber           String?             @map("registration_number") @db.VarChar(80)
+  registrationNumberNormalized String?             @map("registration_number_normalized") @db.VarChar(240)
+  make                         String?             @db.VarChar(80)
+  model                        String?             @db.VarChar(80)
+  year                         Int?
+  colour                       String?             @db.VarChar(80)
+  chassisNumber                String?             @map("chassis_number") @db.VarChar(80)
+  engineNumber                 String?             @map("engine_number") @db.VarChar(80)
+  engineCapacity               String?             @map("engine_capacity") @db.VarChar(40)
+  usageType                    String?             @map("usage_type") @db.VarChar(40)
+  stateOfRegistration          String?             @map("state_of_registration") @db.VarChar(80)
+  createdAt                    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  categoryRecord               VehicleCategory     @relation(fields: [category], references: [code], onDelete: Restrict)
+  ownership                    VehicleOwnership?
+
+  @@index([registrationNumberNormalized])
+  @@index([createdAt, id])
+  @@map("vehicles")
+}
+
+// Keep ownership separate from vehicle details. Organization ownership can
+// extend this association later; this API only creates individual ownerships.
+model VehicleOwnership {
+  vehicleId String  @id @map("vehicle_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, vehicleId])
+  @@map("vehicle_ownerships")
 }

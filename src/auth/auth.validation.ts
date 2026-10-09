@@ -32,10 +32,10 @@ const phone = z
       defaultCountry: 'NG',
       extract: false,
     });
-    if (!parsed?.isValid() || parsed.ext) {
+    if (!parsed?.isPossible() || parsed.ext) {
       context.addIssue({
         code: 'custom',
-        message: 'Use a valid phone number without an extension',
+        message: 'Use a phone number with the correct number of digits',
       });
       return z.NEVER;
     }
@@ -48,8 +48,8 @@ export const registerSchema = z.strictObject({
   email,
   phone,
   password: password.refine(
-    (value) => [...value].length >= 15,
-    'Use at least 15 characters',
+    (value) => [...value].length >= 8,
+    'Use at least 8 characters',
   ),
 });
 

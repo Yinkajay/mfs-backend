@@ -221,7 +221,7 @@ test('registration normalizes inputs, captures unverified timestamps, and hides 
 test('registration rejects invalid/overlong inputs and privilege or verification fields', async () => {
   await withApp({}, async ({ database, register }) => {
     for (const invalid of [
-      { ...sample, password: 'short' },
+      { ...sample, password: '1234567' },
       { ...sample, password: 'x'.repeat(129) },
       { ...sample, phone: 'not-a-phone' },
       { ...sample, email: 'broken' },
@@ -240,11 +240,15 @@ test('registration rejects invalid/overlong inputs and privilege or verification
   });
   const unicode = {
     ...sample,
-    password: '🔐'.repeat(15),
+    password: '🔐'.repeat(8),
     firstName: 'Ada  Chika',
   };
   assert.equal(registerSchema.parse(unicode).password, unicode.password);
   assert.equal(registerSchema.parse(unicode).firstName, 'Ada Chika');
+  assert.equal(
+    registerSchema.parse({ ...sample, phone: '0202915288' }).phone,
+    '+2340202915288',
+  );
 });
 
 test('login uses a fresh HttpOnly cookie, stores only a digest, and me returns a safe profile', async () => {
@@ -586,6 +590,10 @@ test('OpenAPI includes only this slice, marks password write-only, and excludes 
     assert.equal(
       document.components.schemas.RegisterDto.properties.password.writeOnly,
       true,
+    );
+    assert.equal(
+      document.components.schemas.RegisterDto.properties.password.minLength,
+      8,
     );
     assert.ok(
       !Object.hasOwn(

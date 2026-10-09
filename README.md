@@ -1,6 +1,6 @@
 # MFS backend
 
-NestJS 11 with TypeScript, REST under `/v1`, PostgreSQL, and Prisma 7. Includes health/readiness, OpenAPI, and the initial customer authentication slice. No frontend, staff login/RBAC/MFA, verification delivery, recovery, or later business features are included.
+NestJS 11 with TypeScript, REST under `/v1`, PostgreSQL, and Prisma 7. Includes health/readiness, OpenAPI, customer authentication, and the customer vehicle garage. No frontend, staff login/RBAC/MFA, verification delivery, recovery, or later business features are included.
 
 ## Prerequisites
 
@@ -74,17 +74,62 @@ Readiness errors omit database credentials and internal error details. Prisma co
 Register with exactly `firstName`, `lastName`, `email`, `phone`, and `password`; login takes exactly `email` and `password`. Unknown properties, including account kind/status and verification timestamps, are rejected.
 
 - Names are trimmed, whitespace-normalized, and NFC-normalized; control/format characters are rejected. Email is trimmed and lowercased, with no provider-specific dot/plus rewriting. It is the unique login identifier.
-- Phone numbers are validated with full libphonenumber metadata and stored in E.164; Nigerian national format is accepted by default, as are valid international numbers. Phone is not a login identifier and is **not unique** in this slice; confirm the shared-number policy before introducing phone login/recovery.
-- New passwords require 15–128 Unicode code points (at most 1,024 UTF-8 bytes). Passwords are never trimmed, truncated, or normalized. Salted scrypt uses `N=131072`, `r=8`, `p=1`, with constant-time comparison and at most two concurrent derivations per process. Unknown users still perform password verification work. No plaintext password is stored or logged.
+- Phone numbers are checked for a possible length and structure, then stored in E.164; Nigerian national format is accepted by default, as are possible international numbers. Exact carrier or number-block recognition is deliberately not required at signup. Phone is not a login identifier and is **not unique** in this slice; confirm the shared-number policy before introducing phone login/recovery.
+- New passwords require 8–128 Unicode code points (at most 1,024 UTF-8 bytes). Passwords are never trimmed, truncated, or normalized. Salted scrypt uses `N=131072`, `r=8`, `p=1`, with constant-time comparison and at most two concurrent derivations per process. Unknown users still perform password verification work. No plaintext password is stored or logged.
 - Registration returns the same `202` body and no cookie for both new and existing emails. Duplicate requests never replace credentials. Sign in separately. Invalid passwords, missing users, disabled accounts, and staff identities all receive `401` with `Invalid email or password`.
 - Login creates a random 256-bit opaque token, delivered only in the cookie. Only its SHA-256 digest is stored in `sessions`. A supplied previous session is revoked on successful login. Default expiration is seven days absolute and 24 hours idle; `/me` checks account kind/status, expiry, and revocation and refreshes last-seen time. Logout revokes the stored token, not just the browser cookie.
 - Cookies are host-only, HttpOnly, `SameSite=Lax`, and `Path=/`. Local HTTP uses `mfs_session`; secure environments use `__Host-mfs_session` with `Secure`. Production requires secure cookies, HTTPS browser origins, and HTTPS auth requests. Configure known proxy hops only behind a restricted reverse proxy; spoofed forwarding headers are ignored by default.
 - **Every auth POST requires `Content-Type: application/json` and `X-MFS-CSRF: 1`, including logout.** Browser requests must come from an exact `AUTH_ALLOWED_ORIGINS` entry; credentialed CORS is restricted to that list. The custom header forces a preflight on cross-origin browser mutations and blocks simple form requests; SameSite is additional protection. This API currently expects a same-site frontend/API deployment, such as `mfsservicesng.com` and `api.mfsservicesng.com`.
 - Browser clients must use `credentials: 'include'`; session tokens are not returned in JSON or available to JavaScript. OpenAPI includes request/response models, the cookie scheme, and CSRF requirements. Auth responses/errors use `Cache-Control: no-store`, and errors never echo database internals or submitted secrets.
 
-`users` includes nullable `emailVerifiedAt` and `phoneVerifiedAt`; registration leaves both unset. `ACTIVE` means permitted to sign in, **not verified**. Until verification is built, unverified customers can use login and `/me` only; do not treat the supplied email/phone as proven ownership for later sensitive workflows. Generic registration responses and throttles reduce enumeration, but signup-then-login probing cannot be fully eliminated without a verification gate. The gating policy remains an explicit business/security decision.
+`users` includes nullable `emailVerifiedAt` and `phoneVerifiedAt`; registration leaves both unset. `ACTIVE` means permitted to sign in, **not verified**. Unverified customers may sign in, access `/me`, and manage their own garage; do not treat the supplied email/phone as proven ownership for later sensitive workflows. Generic registration responses and throttles reduce enumeration, but signup-then-login probing cannot be fully eliminated without a verification gate. The gating policy remains an explicit business/security decision.
 
-### Brute-force protection
+## Customer vehicle garage
+
+All routes require the existing HttpOnly customer session cookie. Staff, disabled, expired, and revoked sessions are rejected by the existing session guard. Credentials-enabled CORS remains restricted to exact configured origins and now permits PATCH/DELETE. Every vehicle mutation requires `X-MFS-CSRF: 1`; POST/PATCH also require JSON. DELETE needs no body. Requests share the existing 120-per-IP-per-minute customer-session boundary; no new auth mechanism is introduced.
+
+| Route                     | Response                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `POST /v1/vehicles`       | `201` with the created vehicle; ownership always comes from the session.           |
+| `GET /v1/vehicles`        | `{ items, total, limit, offset }`, newest first with UUID as a stable tie breaker. |
+| `GET /v1/vehicles/:id`    | The signed-in customer's vehicle.                                                  |
+| `PATCH /v1/vehicles/:id`  | Updated vehicle; omitted fields stay unchanged and null clears optional fields.    |
+| `DELETE /v1/vehicles/:id` | `204`; hard deletes the vehicle and its ownership association.                     |
+
+Foreign and nonexistent vehicle IDs receive the same `404`. Reads, lists/counts, updates, and deletes are ownership-scoped at the database query, including the actual update/delete statement. Unknown body/query properties are rejected, so callers cannot assign an owner, normalized value, ID, or timestamps. Responses use an explicit vehicle-field projection, never customer credentials or ownership internals; errors and responses use `Cache-Control: no-store`.
+
+- `category` is required: `BIKE`, `SALOON`, `SUV_PICKUP`, `TRUCK`, or `BUS_MINI_TRUCK`. Categories are independent database rows, seeded by migration; no category-management endpoints are added.
+- All remaining details are optional/nullable so an unregistered or partially known vehicle can be saved: `name`, `registrationNumber`, `make`, `model`, `year`, `colour`, `chassisNumber`, `engineNumber`, `engineCapacity`, `usageType`, `stateOfRegistration`.
+- `name` is a customer label such as Family car or Work van, up to 80 characters. It is trimmed/NFC-normalized, rejects control/format characters, and is not unique. Omit it to keep a current name unchanged on PATCH; send `null` to clear it. Existing vehicles remain unnamed.
+- Registration display text is preserved exactly (up to 80 characters, nonblank, no control/format characters). The paired searchable value uses NFC, uppercase, and removes whitespace; punctuation is retained. Null clears both values. It has a nonunique index: duplicates within and across garages are allowed.
+- Other text is trimmed/NFC-normalized, nonblank, and length-bounded. `year` must be a four-digit integer (1000–9999), with no age/current-year business rule. `engineCapacity` is text including the supplied unit, not a guessed numeric unit. `usageType` and `stateOfRegistration` remain text rather than an invented closed vocabulary.
+- Lists accept `limit` (default 20, 1–100), `offset` (default 0, 0–100000), and optional `registrationNumber` for an exact normalized match. There is no cross-customer search.
+- `vehicle_ownerships` separates individual ownership from vehicle details and allows an organization association to be introduced later without embedding fleet behavior now. Customer account deletion is restricted while it owns vehicles; no account-deletion feature is introduced.
+
+Example JSON body:
+
+```json
+{
+  "category": "SALOON",
+  "name": "Family car",
+  "registrationNumber": "ABC 123 LA",
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2019,
+  "colour": "Blue",
+  "engineCapacity": "2.5 L",
+  "usageType": "PRIVATE",
+  "stateOfRegistration": "Lagos"
+}
+```
+
+Migrations: `20261004150000_customer_vehicle_garage` and additive `20261004202825_vehicle_name`. Apply them to the existing verified Neon development link with `npm run db:migrate:development`; never use production, `neon deploy`, or a shadow/reset workflow. OpenAPI at `/v1/docs` documents the request/response fields, pagination, CSRF, and errors.
+
+Run `npm test` for controlled foundation/auth/garage tests. `npm run test:vehicles:integration` verifies the pinned Neon development compute, starts a separate API on a temporary local port, checks real two-customer isolation and CRUD, and removes only its exact synthetic fixtures/counter keys. It does not migrate, deploy, or stop an existing development server.
+
+Business confirmation still needed before stricter workflows: required details by registration stage, allowed usage types/states, canonical engine-capacity units, registration punctuation/format/duplicate policy, and future retention/deletion rules once requests or documents reference a vehicle. No uploads, services, pricing, compliance, or organization features are implemented here.
+
+## Authentication security
 
 PostgreSQL `auth_rate_limits` stores atomic, expiring counters shared by API instances and retained across restarts. Keys hash a namespace, scope, and normalized email or socket IP; plaintext identifiers are not stored in the counter table. All instances must use the same namespace. Hashing here is not a claim of irreversible anonymization.
 

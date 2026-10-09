@@ -9,7 +9,7 @@ export class RegisterDto {
     maxLength: 40,
   })
   phone!: string;
-  @ApiProperty({ minLength: 15, maxLength: 128, writeOnly: true })
+  @ApiProperty({ minLength: 8, maxLength: 128, writeOnly: true })
   password!: string;
 }
 

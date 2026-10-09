@@ -22,5 +22,11 @@ import { SessionService } from './session.service';
     CustomerSessionGuard,
     AuthExceptionFilter,
   ],
+  exports: [
+    AuthBoundaryGuard,
+    CustomerSessionGuard,
+    AuthRateLimitService,
+    SessionService,
+  ],
 })
 export class AuthModule {}
