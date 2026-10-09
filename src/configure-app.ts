@@ -62,7 +62,7 @@ export function configureApplication(app: INestApplication): void {
     const documentConfig = new DocumentBuilder()
       .setTitle('MFS Services API')
       .setDescription(
-        'MFS REST API. POST/PATCH require JSON. All mutations require X-MFS-CSRF: 1. Registration does not create a session; login sets an HttpOnly cookie. Vehicle routes are customer-owned.',
+        'MFS REST API. POST/PATCH require JSON. All mutations require X-MFS-CSRF: 1. Registration does not create a session; login sets an HttpOnly cookie. Vehicle routes are customer-owned. The service catalogue is public and read-only.',
       )
       .setVersion('0.1.0')
       .addCookieAuth(

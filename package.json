@@ -18,6 +18,8 @@
     "test": "npm run build && node --test test/*.test.cjs",
     "test:integration": "npm run build && node test/auth.integration.cjs",
     "test:vehicles:integration": "npm run build && node test/vehicles.integration.cjs",
+    "test:services:integration": "npm run build && node test/services.integration.cjs",
+    "test:pricing:integration": "npm run build && node test/pricing.integration.cjs",
     "check": "npm run prisma:validate && npm run lint && npm run format:check && npm test",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
@@ -28,7 +30,9 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:development": "node scripts/migrate-development.cjs",
-    "db:migrate:status": "prisma migrate status"
+    "db:migrate:status": "prisma migrate status",
+    "db:seed:catalogue": "npm run build && node scripts/seed-catalogue.cjs",
+    "db:seed:catalogue:development": "npm run build && node scripts/seed-development.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",

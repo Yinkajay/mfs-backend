@@ -1,6 +1,6 @@
 # MFS backend
 
-NestJS 11 with TypeScript, REST under `/v1`, PostgreSQL, and Prisma 7. Includes health/readiness, OpenAPI, customer authentication, and the customer vehicle garage. No frontend, staff login/RBAC/MFA, verification delivery, recovery, or later business features are included.
+NestJS 11 with TypeScript, REST under `/v1`, PostgreSQL, and Prisma 7. Includes health/readiness, OpenAPI, customer authentication, the customer vehicle garage, and a public read-only service catalogue. No frontend, staff login/RBAC/MFA, verification delivery, recovery, or later transactional features are included.
 
 ## Prerequisites
 
@@ -43,11 +43,12 @@ For an already authenticated Neon CLI and the existing link:
 ```sh
 neon env pull --project-id nameless-feather-21505568 --branch development --file .env --service postgres
 npm run db:migrate:development
+npm run db:seed:catalogue:development
 npm run prisma:generate
 npm run dev
 ```
 
-`db:migrate:development` verifies the pinned project/branch, expiration, both connection hosts against Neon's development compute, matching database/credentials, and ignored files before running **Prisma** `migrate deploy`. Conflicting runtime database overrides are rejected. This is not `neon deploy` and does not provision services. Do not run `prisma migrate dev` against Neon: it may need a shadow database. The checked-in initial migration was generated with a local schema diff and includes a transaction; no reset/baseline was used.
+`db:migrate:development` verifies the pinned project/branch, expiration, both connection hosts against Neon's development compute, matching database/credentials, and ignored files before running **Prisma** `migrate deploy`. `db:seed:catalogue:development` performs the same verification before applying the idempotent catalogue seed. Conflicting runtime database overrides are rejected. Neither command runs `neon deploy` or provisions services. Do not run `prisma migrate dev` against Neon: it may need a shadow database.
 
 ## Endpoints
 
@@ -127,7 +128,32 @@ Migrations: `20261004150000_customer_vehicle_garage` and additive `2026100420282
 
 Run `npm test` for controlled foundation/auth/garage tests. `npm run test:vehicles:integration` verifies the pinned Neon development compute, starts a separate API on a temporary local port, checks real two-customer isolation and CRUD, and removes only its exact synthetic fixtures/counter keys. It does not migrate, deploy, or stop an existing development server.
 
-Business confirmation still needed before stricter workflows: required details by registration stage, allowed usage types/states, canonical engine-capacity units, registration punctuation/format/duplicate policy, and future retention/deletion rules once requests or documents reference a vehicle. No uploads, services, pricing, compliance, or organization features are implemented here.
+Business confirmation still needed before stricter workflows: required details by registration stage, allowed usage types/states, canonical engine-capacity units, registration punctuation/format/duplicate policy, and future retention/deletion rules once requests or documents reference a vehicle. No uploads, pricing resolution, compliance, or organization features are implemented here.
+
+## Public service catalogue
+
+The catalogue is database-backed and deliberately read-only. Both endpoints are unauthenticated and return only active services, active variants, and applicable vehicle categories:
+
+| Route                    | Response                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `GET /v1/services`       | `{ items }` in the source catalogue order.                                      |
+| `GET /v1/services/:slug` | One active service or the same generic `404` used for an unknown/inactive slug. |
+
+The idempotent seed contains the blueprint’s 18 services plus **Police Report and Affidavit**, five documented driver’s-licence variants, and links every service to all five vehicle categories. It upserts stable source-controlled names, slugs, order, and active status without manufacturing descriptions. Run it locally with `npm run db:seed:catalogue`; use the guarded `npm run db:seed:catalogue:development` for the pinned Neon development branch.
+
+No price, pricing strategy, turnaround estimate, requirement, or availability inference from blank source cells is exposed by the catalogue endpoints. Confirmed amounts supplied after the blueprint are recorded in [catalogue source notes](docs/catalogue-notes.md).
+
+Migration: `20261009120000_service_catalogue`. OpenAPI documents both public routes. Run `npm test` for controlled tests and `npm run test:services:integration` for a read-only check against the verified Neon development branch.
+
+## Versioned pricing resolver
+
+`PricingService.resolvePrice` is an internal backend interface; this slice adds no public pricing route. It accepts a service, optional vehicle category and variant, optional decimal declared value, and requested date. It returns either an `AUTO` NGN amount as a decimal string with the rule ID/version, or `MANUAL_REVIEW` with a stable reason and customer-safe message.
+
+Pricing rules support `FIXED_BY_VEHICLE_CATEGORY`, `FIXED_BY_VARIANT`, `FIXED_UNIVERSAL`, `PERCENTAGE_OF_DECLARED_VALUE`, `MANUAL_QUOTE`, and `MANUAL_REVIEW`. Only `ACTIVE` rules whose half-open effective window contains the requested date are considered. A more specific category/variant rule takes precedence over a universal rule; overlapping rules at the same specificity return manual review rather than choosing silently. Missing, pending, invalid, or unavailable combinations never produce zero.
+
+Money uses PostgreSQL `DECIMAL(18,2)` and percentages use `DECIMAL(7,4)`. The resolver uses Prisma Decimal throughout and returns strings, avoiding JavaScript floating point. Percentage results requiring more than two decimal places return manual review until MFS confirms a rounding policy.
+
+Migration: `20261009170000_versioned_pricing_rules`. It creates no pricing rows because effective dates remain undecided. Confirmed amounts are exercised only as temporary test fixtures; SUV/Pickup Vehicle Licence and Comprehensive Insurance remain manual-review fixtures. Run `npm run test:pricing:integration` for the guarded Neon development check; it removes its exact fixtures afterward.
 
 ## Authentication security
 

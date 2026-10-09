@@ -73,10 +73,27 @@ enum VehicleCategoryCode {
   BUS_MINI_TRUCK
 }
 
+enum PricingStrategy {
+  FIXED_BY_VEHICLE_CATEGORY
+  FIXED_BY_VARIANT
+  FIXED_UNIVERSAL
+  PERCENTAGE_OF_DECLARED_VALUE
+  MANUAL_QUOTE
+  MANUAL_REVIEW
+}
+
+enum PricingRuleStatus {
+  ACTIVE
+  PENDING_CONFIRMATION
+  RETIRED
+}
+
 model VehicleCategory {
-  code     VehicleCategoryCode @id
-  name     String              @db.VarChar(60)
-  vehicles Vehicle[]
+  code         VehicleCategoryCode      @id
+  name         String                   @db.VarChar(60)
+  vehicles     Vehicle[]
+  services     ServiceVehicleCategory[]
+  pricingRules PricingRule[]
 
   @@map("vehicle_categories")
 }
@@ -116,4 +133,75 @@ model VehicleOwnership {
 
   @@index([userId, vehicleId])
   @@map("vehicle_ownerships")
+}
+
+model Service {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  code                 String                   @unique @db.VarChar(80)
+  name                 String                   @db.VarChar(120)
+  slug                 String                   @unique @db.VarChar(120)
+  description          String?                  @db.Text
+  active               Boolean                  @default(true)
+  sortOrder            Int                      @map("sort_order")
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  variants             ServiceVariant[]
+  applicableCategories ServiceVehicleCategory[]
+  pricingRules         PricingRule[]
+
+  @@index([active, sortOrder, id])
+  @@map("services")
+}
+
+model ServiceVariant {
+  id           String        @id @default(uuid()) @db.Uuid
+  serviceId    String        @map("service_id") @db.Uuid
+  code         String        @db.VarChar(60)
+  name         String        @db.VarChar(80)
+  description  String?       @db.Text
+  active       Boolean       @default(true)
+  sortOrder    Int           @map("sort_order")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  pricingRules PricingRule[]
+
+  @@unique([serviceId, code])
+  @@index([serviceId, active, sortOrder, id])
+  @@map("service_variants")
+}
+
+model ServiceVehicleCategory {
+  serviceId    String              @map("service_id") @db.Uuid
+  categoryCode VehicleCategoryCode @map("category_code")
+  service      Service             @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  category     VehicleCategory     @relation(fields: [categoryCode], references: [code], onDelete: Restrict)
+
+  @@id([serviceId, categoryCode])
+  @@index([categoryCode, serviceId])
+  @@map("service_vehicle_categories")
+}
+
+model PricingRule {
+  id                  String               @id @default(uuid()) @db.Uuid
+  serviceId           String               @map("service_id") @db.Uuid
+  vehicleCategoryCode VehicleCategoryCode? @map("vehicle_category_code")
+  serviceVariantId    String?              @map("service_variant_id") @db.Uuid
+  strategy            PricingStrategy
+  amount              Decimal?             @db.Decimal(18, 2)
+  percentage          Decimal?             @db.Decimal(7, 4)
+  currency            String               @default("NGN") @db.Char(3)
+  effectiveFrom       DateTime             @map("effective_from") @db.Timestamptz(3)
+  effectiveTo         DateTime?            @map("effective_to") @db.Timestamptz(3)
+  status              PricingRuleStatus    @default(PENDING_CONFIRMATION)
+  version             Int
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  service             Service              @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  vehicleCategory     VehicleCategory?     @relation(fields: [vehicleCategoryCode], references: [code], onDelete: Restrict)
+  serviceVariant      ServiceVariant?      @relation(fields: [serviceVariantId], references: [id], onDelete: Restrict)
+
+  @@index([serviceId, status, effectiveFrom, effectiveTo])
+  @@index([vehicleCategoryCode, serviceId])
+  @@index([serviceVariantId, serviceId])
+  @@map("pricing_rules")
 }
